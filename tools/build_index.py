@@ -57,11 +57,11 @@ def main() -> None:
             im = front_matter(idea / "README.md")
             ilink = f"{link}ideas/{idea.name}/"
             # creation order = stream of thought
-            ideas.append((str(im.get("created", "")), idea.stat().st_ctime, im, ilink))
+            ideas.append((str(im.get("created", "")), im, ilink))
             counts[im.get("status", "?")] += 1
             for t in im["tags"]:
                 by_tag[t].append(f"[{folder.name}/{idea.name}]({ilink})")
-        for *_, im, ilink in sorted(ideas, key=lambda x: x[:2]):
+        for _, im, ilink in sorted(ideas, key=lambda x: x[0]):
             lines.append(row(im, ilink, "  "))
         areas.append("\n".join(lines))
 

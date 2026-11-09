@@ -39,7 +39,7 @@ def render(folder: Path, title: str, question: str, tags: list[str]) -> None:
     folder.mkdir(parents=True)
     values = {
         "{title}": title,
-        "{date}": dt.date.today().isoformat(),
+        "{date}": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
         # JSON strings/lists are valid YAML, so quotes and colons in a question are safe
         "{question_yaml}": json.dumps(question),
         "{question}": question,

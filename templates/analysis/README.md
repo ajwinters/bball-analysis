@@ -1,9 +1,9 @@
 ---
 title: {title}
-question: 
+question: {question_yaml}
 status: idea   # idea | active | done | dropped
 created: {date}
-tags: []
+tags: {tags}
 parent: {parent}
 data: 
 ---
@@ -11,6 +11,8 @@ data:
 # {title}
 
 ## Question
+
+{question}
 
 ## Findings
 

@@ -1,14 +1,19 @@
-"""Create a new analysis or idea folder from templates/analysis/.
+"""Create a new area or idea folder from templates/analysis/, then rebuild INDEX.md.
 
-    pixi run new shooting corner-threes                     # analyses/shooting-corner-threes/
-    pixi run new shooting-corner-threes --idea wing-vs-corner   # .../ideas/wing-vs-corner/
-    pixi run new shooting-corner-threes --idea shot-clock --parent wing-vs-corner
+    pixi run new reffing                                   # analyses/reffing/
+    pixi run new reffing/late-calls-by-crew-chief \\
+        -q "Number of calls in the last 5 minutes of a game, by crew chief" \\
+        -t officiating,clutch
+    pixi run new reffing/star-call-rate --parent late-calls-by-crew-chief
 
-Then rebuilds INDEX.md.
+An area is any subject you want to explore. Ideas are the specific lines of thought
+inside it, one folder each, one level deep. --parent records which idea one branched off.
+Tags are free-form; tags.txt lists the usual ones (unknown tags get a warning, not an error).
 """
 
 import argparse
 import datetime as dt
+import json
 import re
 import subprocess
 import sys
@@ -20,22 +25,31 @@ TEMPLATE = ROOT / "templates" / "analysis"
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
-def topics() -> list[str]:
-    lines = (ROOT / "topics.txt").read_text().splitlines()
-    return [ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")]
+def known_tags() -> set[str]:
+    lines = (ROOT / "tags.txt").read_text().splitlines()
+    return {ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")}
 
 
 def check_slug(s: str) -> None:
     if not SLUG.match(s):
-        sys.exit(f"'{s}': use lowercase letters, digits and single hyphens (e.g. corner-threes)")
+        sys.exit(f"'{s}': use lowercase letters, digits and single hyphens (e.g. star-call-rate)")
 
 
-def render(folder: Path, title: str, parent: str) -> None:
+def render(folder: Path, title: str, parent: str, question: str, tags: list[str]) -> None:
     folder.mkdir(parents=True)
+    values = {
+        "{title}": title,
+        "{parent}": parent,
+        "{date}": dt.date.today().isoformat(),
+        # JSON strings/lists are valid YAML, so quotes and colons in a question are safe
+        "{question_yaml}": json.dumps(question),
+        "{question}": question,
+        "{tags}": json.dumps(tags),
+    }
     for name in ("README.md", "notebook.py"):
         text = (TEMPLATE / name).read_text()
-        text = text.replace("{title}", title).replace("{parent}", parent)
-        text = text.replace("{date}", dt.date.today().isoformat())
+        for k, v in values.items():
+            text = text.replace(k, v)
         (folder / name).write_text(text)
     for sub in ("figures", "tables", "docs"):
         (folder / sub).mkdir()
@@ -45,36 +59,40 @@ def render(folder: Path, title: str, parent: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("first", help="topic (new analysis) or existing analysis folder (with --idea)")
-    ap.add_argument("slug", nargs="?", help="slug for a new analysis")
-    ap.add_argument("--idea", help="slug of a new idea inside the analysis")
-    ap.add_argument("--parent", default="", help="idea this one branches off (same analysis)")
+    ap.add_argument("path", help="<area> for a new area, or <area>/<idea> for a new idea")
+    ap.add_argument("-q", "--question", default="", help="the exact question, in a sentence")
+    ap.add_argument("-t", "--tags", default="", help="comma-separated tags, e.g. officiating,clutch")
+    ap.add_argument("--parent", default="", help="idea this one branches off (same area)")
     a = ap.parse_args()
 
-    if a.idea:
-        analysis = ANALYSES / a.first
-        if not analysis.is_dir():
-            sys.exit(f"no analysis folder {analysis.relative_to(ROOT)}")
-        check_slug(a.idea)
-        if a.parent and not (analysis / "ideas" / a.parent).is_dir():
-            sys.exit(f"no idea '{a.parent}' in {a.first}")
-        folder = analysis / "ideas" / a.idea
-        parent = a.parent or a.first
-        title = a.idea.replace("-", " ").capitalize()
+    tags = [t.strip() for t in a.tags.split(",") if t.strip()]
+    unknown = [t for t in tags if t not in known_tags()]
+    if unknown:
+        print(f"note: new tag(s) {', '.join(unknown)}; add to tags.txt if they'll be reused")
+
+    parts = a.path.strip("/").split("/")
+    if len(parts) == 1:
+        area = parts[0]
+        check_slug(area)
+        if a.parent:
+            sys.exit("--parent is for ideas (<area>/<idea>)")
+        folder, parent = ANALYSES / area, ""
+        title = area.replace("-", " ").capitalize()
+    elif len(parts) == 2:
+        area, idea = parts
+        if not (ANALYSES / area).is_dir():
+            sys.exit(f"no area analyses/{area}/ yet; create it first: pixi run new {area}")
+        check_slug(idea)
+        if a.parent and not (ANALYSES / area / "ideas" / a.parent).is_dir():
+            sys.exit(f"no idea '{a.parent}' in {area}")
+        folder, parent = ANALYSES / area / "ideas" / idea, a.parent or area
+        title = idea.replace("-", " ").capitalize()
     else:
-        if not a.slug:
-            sys.exit("usage: pixi run new <topic> <slug>   (see --help)")
-        if a.first not in topics():
-            sys.exit(f"unknown topic '{a.first}'. Known: {', '.join(topics())}. "
-                     "Add it to topics.txt if it's really new.")
-        check_slug(a.slug)
-        folder = ANALYSES / f"{a.first}-{a.slug}"
-        parent = a.parent
-        title = a.slug.replace("-", " ").capitalize()
+        sys.exit("ideas go one level deep: <area>/<idea>. Use --parent to record a branch.")
 
     if folder.exists():
         sys.exit(f"{folder.relative_to(ROOT)} already exists")
-    render(folder, title, parent)
+    render(folder, title, parent, a.question, tags)
     subprocess.run([sys.executable, str(ROOT / "tools" / "build_index.py")], check=True)
 
 

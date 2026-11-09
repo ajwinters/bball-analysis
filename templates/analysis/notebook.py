@@ -22,7 +22,7 @@ def _(mo):
     mo.md("""
     # {title}
 
-    **Question:**
+    **Question:** {question}
     """)
     return
 

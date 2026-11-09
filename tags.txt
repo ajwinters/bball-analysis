@@ -1,0 +1,20 @@
+# Usual tags (loose taxonomy, not a restriction). Tags go in README front matter.
+# New tags are fine; add them here once they get reused, to keep spelling consistent.
+shooting
+defense
+rebounding
+playmaking
+scoring
+lineups
+players
+teams
+pace
+clutch
+playoffs
+draft
+officiating
+injuries
+arena
+tracking-era
+schedule
+data

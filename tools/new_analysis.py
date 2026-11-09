@@ -4,10 +4,10 @@
     pixi run new reffing/late-calls-by-crew-chief \\
         -q "Number of calls in the last 5 minutes of a game, by crew chief" \\
         -t officiating,clutch
-    pixi run new reffing/star-call-rate --parent late-calls-by-crew-chief
+    pixi run new reffing/star-call-rate -q "Calls per possession for star players"
 
 An area is any subject you want to explore. Ideas are the specific lines of thought
-inside it, one folder each, one level deep. --parent records which idea one branched off.
+inside it, one folder each, one level deep. INDEX.md lists them in the order created.
 Tags are free-form; tags.txt lists the usual ones (unknown tags get a warning, not an error).
 """
 
@@ -35,11 +35,10 @@ def check_slug(s: str) -> None:
         sys.exit(f"'{s}': use lowercase letters, digits and single hyphens (e.g. star-call-rate)")
 
 
-def render(folder: Path, title: str, parent: str, question: str, tags: list[str]) -> None:
+def render(folder: Path, title: str, question: str, tags: list[str]) -> None:
     folder.mkdir(parents=True)
     values = {
         "{title}": title,
-        "{parent}": parent,
         "{date}": dt.date.today().isoformat(),
         # JSON strings/lists are valid YAML, so quotes and colons in a question are safe
         "{question_yaml}": json.dumps(question),
@@ -62,7 +61,6 @@ def main() -> None:
     ap.add_argument("path", help="<area> for a new area, or <area>/<idea> for a new idea")
     ap.add_argument("-q", "--question", default="", help="the exact question, in a sentence")
     ap.add_argument("-t", "--tags", default="", help="comma-separated tags, e.g. officiating,clutch")
-    ap.add_argument("--parent", default="", help="idea this one branches off (same area)")
     a = ap.parse_args()
 
     tags = [t.strip() for t in a.tags.split(",") if t.strip()]
@@ -74,25 +72,21 @@ def main() -> None:
     if len(parts) == 1:
         area = parts[0]
         check_slug(area)
-        if a.parent:
-            sys.exit("--parent is for ideas (<area>/<idea>)")
-        folder, parent = ANALYSES / area, ""
+        folder = ANALYSES / area
         title = area.replace("-", " ").capitalize()
     elif len(parts) == 2:
         area, idea = parts
         if not (ANALYSES / area).is_dir():
             sys.exit(f"no area analyses/{area}/ yet; create it first: pixi run new {area}")
         check_slug(idea)
-        if a.parent and not (ANALYSES / area / "ideas" / a.parent).is_dir():
-            sys.exit(f"no idea '{a.parent}' in {area}")
-        folder, parent = ANALYSES / area / "ideas" / idea, a.parent or area
+        folder = ANALYSES / area / "ideas" / idea
         title = idea.replace("-", " ").capitalize()
     else:
-        sys.exit("ideas go one level deep: <area>/<idea>. Use --parent to record a branch.")
+        sys.exit("ideas go one level deep: <area>/<idea>")
 
     if folder.exists():
         sys.exit(f"{folder.relative_to(ROOT)} already exists")
-    render(folder, title, parent, a.question, tags)
+    render(folder, title, a.question, tags)
     subprocess.run([sys.executable, str(ROOT / "tools" / "build_index.py")], check=True)
 
 

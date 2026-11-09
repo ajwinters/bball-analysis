@@ -15,7 +15,7 @@ NBA analytics. Sister repo to `../bballagg`, which scrapes stats.nba.com and own
 
 ```
 analyses/<area>/                  an area to explore, any subject (reffing, stadium-altitude, injuries)
-    README.md                     front matter: title, question, status, created, tags, parent, data
+    README.md                     front matter: title, question, status, created, tags, data
     notebook.py                   marimo
     figures/ tables/ docs/        committed (keep tables small)
     extracts/ models/             gitignored
@@ -30,7 +30,7 @@ tags.txt                          usual tags (loose taxonomy, not enforced)
 
 Rules:
 - Areas are free-form subjects, not limited to a fixed list. Ideas are the exact, answerable questions inside an area; the slug is short, the full question goes in `question:`. Together the idea folders are the trail of where each number came from.
-- Ideas nest one level only. An idea that branches off another idea is a sibling folder with `parent: <idea-slug>` in its README. An idea that grows into a subject of its own is promoted to a new area (`git mv`, set `parent:` to where it came from).
+- Ideas nest one level only, all in the area's `ideas/` folder. INDEX.md lists them in creation order, which is the stream of thought. An idea that grows into a subject of its own can be promoted to a new area (`git mv`, mention where it came from in its README).
 - Names: lowercase-hyphen slugs, no dates or numbers. Dates and tags go in front matter.
 - Tags are for cross-cutting search (`officiating`, `clutch`, `tracking-era`). Any tag is allowed; add reused ones to `tags.txt` to keep spelling consistent.
 - Shared logic goes in `src/bball/` as soon as a second notebook needs it. Don't copy helpers between notebooks.
@@ -39,7 +39,7 @@ Rules:
 
 ## Commands
 
-- `pixi run new <area>`: new area. `pixi run new <area>/<idea> [-q "question"] [-t tag1,tag2] [--parent <idea>]`: new idea. `pixi run new --help` for details.
+- `pixi run new <area>`: new area. `pixi run new <area>/<idea> [-q "question"] [-t tag1,tag2]`: new idea. `pixi run new --help` for details.
 - `pixi run edit analyses/<area>/ideas/<idea>/notebook.py`: open in marimo.
 - `pixi run index`: rebuild INDEX.md.
 - Lint: `uvx ruff check .` / `uvx ruff format .`.

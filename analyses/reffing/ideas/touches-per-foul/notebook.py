@@ -23,10 +23,11 @@ def _(mo):
     **Question:** How many touches does a player get per foul called in their favor
     (fouls drawn), and how does that change across seasons?
 
-    Use **Per foul** to swap what is counted: touches, possessions, minutes, FGA or FGM.
+    Use **Per foul** to swap what is counted: touches, possessions, minutes, FGA, FGM,
+    FTA or FTM.
     Lower = a foul comes more often. Sources: touches from player tracking
     (`boxscoreplayertrackv3`, 2013-14 on); possessions (on the floor) from
-    `boxscoreadvancedv3`; minutes, FGA, FGM from `boxscoretraditionalv3`; fouls drawn
+    `boxscoreadvancedv3`; minutes, FGA, FGM, FTA, FTM from `boxscoretraditionalv3`; fouls drawn
     and committed from `boxscoremiscv3`. Every option uses the same tracking-era games.
     Fouls drawn include offensive fouls drawn on defense (charges).
     """)
@@ -55,6 +56,8 @@ def _(db, real):
                    end)::float8           as minutes,
                sum(b.fieldgoalsattempted) as fga,
                sum(b.fieldgoalsmade)      as fgm,
+               sum(b.freethrowsattempted) as fta,
+               sum(b.freethrowsmade)      as ftm,
                sum(m.foulsdrawn)          as fouls_drawn,
                sum(m.foulspersonal)       as fouls_committed
         from nba_boxscoreplayertrackv3_a t
@@ -108,6 +111,8 @@ def _(mo, player_options):
             "Minutes": "minutes",
             "FGA": "fga",
             "FGM": "fgm",
+            "FTA": "fta",
+            "FTM": "ftm",
         },
         value="Touches",
         label="Per foul",

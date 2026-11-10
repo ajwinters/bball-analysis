@@ -18,7 +18,7 @@ How many touches does a player get per foul called in their favor (fouls drawn),
 ## Notes
 
 - Touches: `nba_boxscoreplayertrackv3_a.touches` (tracking era, 2013-14 on). Fouls drawn and committed: `nba_boxscoremiscv3_a.foulsdrawn` / `foulspersonal`. Zero-filled rows dropped with `bball.real`.
-- The notebook can also count minutes, FGA or FGM per foul (from `nba_boxscoretraditionalv3_a`), over the same tracking-era games. Minutes are parsed from `MM:SS`; 191 of ~845k rows are garbled (`-3:00`, `0:0-18`) and count as null.
+- The notebook shows touches, minutes, FGA and FGM per foul as one panel each (own y-scale, shared season axis and hover). Minutes, FGA and FGM come from `nba_boxscoretraditionalv3_a`, over the same tracking-era games. Minutes are parsed from `MM:SS`; 191 of ~845k rows are garbled (`-3:00`, `0:0-18`) and count as null.
 - League, regular season, 20+ games: ~12 minutes, ~4.0-4.8 FGA and ~2 FGM per foul drawn. Harden: ~5 minutes per foul drawn through 2019-20, 7-10 after.
 - Fouls drawn include offensive fouls drawn on defense (charges), not only fouls on the player's own touches.
 - League line pools all qualifying players (sum of touches / sum of fouls), not a mean of player ratios.

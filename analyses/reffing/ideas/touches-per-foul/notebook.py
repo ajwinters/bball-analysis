@@ -6,15 +6,13 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    import warnings
-
     import altair as alt
     import marimo as mo
     import pandas as pd
 
     from bball import db, real
 
-    return alt, db, mo, pd, real, warnings
+    return alt, db, mo, pd, real
 
 
 @app.cell
@@ -25,13 +23,12 @@ def _(mo):
     **Question:** How many touches does a player get per foul called in their favor
     (fouls drawn), and how does that change across seasons?
 
-    Pick what to count per foul: touches, minutes, field goal attempts or makes.
-    Lower = a foul comes more often. Touches come from player tracking
-    (`boxscoreplayertrackv3`, 2013-14 on); minutes, FGA and FGM from
-    `boxscoretraditionalv3`; fouls drawn and committed from `boxscoremiscv3`.
-    Every stat uses the same games (tracking era), so the options are comparable.
-    Fouls drawn include offensive fouls drawn on defense, so charge-takers look
-    better than their touches alone would suggest.
+    Use **Per foul** to swap what is counted: touches, possessions, minutes, FGA or FGM.
+    Lower = a foul comes more often. Sources: touches from player tracking
+    (`boxscoreplayertrackv3`, 2013-14 on); possessions (on the floor) from
+    `boxscoreadvancedv3`; minutes, FGA, FGM from `boxscoretraditionalv3`; fouls drawn
+    and committed from `boxscoremiscv3`. Every option uses the same tracking-era games.
+    Fouls drawn include offensive fouls drawn on defense (charges).
     """)
     return
 
@@ -47,21 +44,26 @@ def _(db, real):
         )
         select g.season, g.seasontype, t.personid,
                max(t.firstname || ' ' || t.familyname) as name,
-               count(*)                as games,
-               sum(t.touches)          as touches,
-               sum(m.foulsdrawn)       as fouls_drawn,
-               sum(m.foulspersonal)    as fouls_committed,
+               count(*)                   as games,
+               sum(t.touches)             as touches,
+               sum(a.possessions)         as possessions,
                sum(case  -- 'MM:SS'; a few rows hold bare minutes; garbled ones -> null
                      when b.minutes ~ '^[0-9]+:[0-9]{{2}}$'
-                       then split_part(b.minutes, ':', 1)::int + split_part(b.minutes, ':', 2)::int / 60.0
+                       then split_part(b.minutes, ':', 1)::int
+                            + split_part(b.minutes, ':', 2)::int / 60.0
                      when b.minutes ~ '^[0-9]+$' then b.minutes::int
-                   end)::float8        as minutes,
+                   end)::float8           as minutes,
                sum(b.fieldgoalsattempted) as fga,
-               sum(b.fieldgoalsmade)   as fgm
+               sum(b.fieldgoalsmade)      as fgm,
+               sum(m.foulsdrawn)          as fouls_drawn,
+               sum(m.foulspersonal)       as fouls_committed
         from nba_boxscoreplayertrackv3_a t
         join g using (gameid)
         join nba_boxscoremiscv3_a m on m.gameid = t.gameid and m.personid = t.personid
         join nba_boxscoretraditionalv3_a b on b.gameid = t.gameid and b.personid = t.personid
+        -- left join: the advanced "real" filter (offensive rating <> 0) would drop real
+        -- low-minute games, so possessions are taken as-is
+        left join nba_boxscoreadvancedv3_a a on a.gameid = t.gameid and a.personid = t.personid
         where {real.where("boxscoreplayertrackv3", "t")}
           and {real.where("boxscoremiscv3", "m")}
           and {real.where("boxscoretraditionalv3", "b")}
@@ -99,10 +101,16 @@ def _(mo, player_options):
         max_selections=8,
         full_width=True,
     )
-    stats = mo.ui.multiselect(
-        options={"Touches": "touches", "Minutes": "minutes", "FGA": "fga", "FGM": "fgm"},
-        value=["Touches", "Minutes", "FGA", "FGM"],
-        label="Per foul (one panel each)",
+    stat = mo.ui.dropdown(
+        options={
+            "Touches": "touches",
+            "Possessions": "possessions",
+            "Minutes": "minutes",
+            "FGA": "fga",
+            "FGM": "fgm",
+        },
+        value="Touches",
+        label="Per foul",
     )
     foul_type = mo.ui.dropdown(
         options={"Fouls drawn": "fouls_drawn", "Fouls committed": "fouls_committed"},
@@ -117,52 +125,34 @@ def _(mo, player_options):
     mo.vstack(
         [
             players,
-            mo.hstack([stats, foul_type, season_type, min_games, show_league], justify="start"),
+            mo.hstack([stat, foul_type, season_type, min_games, show_league], justify="start"),
         ]
     )
-    return foul_type, min_games, players, season_type, show_league, stats
+    return foul_type, min_games, players, season_type, show_league, stat
 
 
 @app.cell(hide_code=True)
-def _(foul_type, min_games, pd, player_options, players, season_type, seasons, stats):
-    STAT_NAMES = {"touches": "Touches", "minutes": "Minutes", "fga": "FGA", "fgm": "FGM"}
-    _f = foul_type.value
+def _(foul_type, min_games, player_options, players, season_type, seasons, stat):
+    _f, _v = foul_type.value, stat.value
     _s = seasons[
         (seasons["seasontype"] == season_type.value)
         & (seasons["games"] >= min_games.value)
         & (seasons[_f] > 0)  # x per 0 fouls is undefined
+        & seasons[_v].notna()
     ]
     seasons_axis = sorted(_s["season"].unique())
-    _id_to_label = {pid: lbl for lbl, pid in player_options.items()}
-    _picked = _s[_s["personid"].isin(players.value)]
 
-    # Long format: one row per (player or league, season, stat).
-    _rows, _league = [], []
-    for _v in stats.value:
-        _p = _picked[_picked[_v].notna()]
-        _rows.append(
-            pd.DataFrame(
-                {
-                    "player": _p["personid"].map(_id_to_label),
-                    "season": _p["season"],
-                    "games": _p["games"],
-                    "stat": STAT_NAMES[_v],
-                    "value": _p[_v],
-                    "fouls": _p[_f],
-                    "per_foul": _p[_v] / _p[_f],
-                }
-            )
-        )
-        # League: all qualifying players pooled (sum of stat / sum of fouls), not a mean of ratios.
-        _l = _s[_s[_v].notna()].groupby("season", as_index=False)[[_v, _f]].sum()
-        _league.append(
-            pd.DataFrame(
-                {"season": _l["season"], "stat": STAT_NAMES[_v], "per_foul": _l[_v] / _l[_f]}
-            )
-        )
-    _cols = ["player", "season", "games", "stat", "value", "fouls", "per_foul"]
-    picked = pd.concat(_rows) if _rows else pd.DataFrame(columns=_cols)
-    league = pd.concat(_league) if _league else pd.DataFrame(columns=["season", "stat", "per_foul"])
+    # League line: all qualifying players pooled (sum of stat / sum of fouls), not a mean of ratios.
+    league = _s.groupby("season", as_index=False)[[_v, _f]].sum()
+    league["per_foul"] = league[_v] / league[_f]
+
+    _id_to_label = {pid: lbl for lbl, pid in player_options.items()}
+    picked = _s[_s["personid"].isin(players.value)].copy()
+    picked["player"] = picked["personid"].map(_id_to_label)
+    picked["value"] = picked[_v]
+    picked["fouls"] = picked[_f]
+    picked["per_foul"] = picked["value"] / picked["fouls"]
+    picked = picked[["player", "season", "games", "value", "fouls", "per_foul"]]
     return league, picked, seasons_axis
 
 
@@ -179,7 +169,7 @@ def _(
     season_type,
     seasons_axis,
     show_league,
-    warnings,
+    stat,
 ):
     # Categorical palette, fixed order (dataviz reference palette, light mode).
     PALETTE = [
@@ -194,117 +184,84 @@ def _(
     ]
     _id_to_label = {pid: lbl for lbl, pid in player_options.items()}
     _order = [_id_to_label[pid] for pid in players.value]
-    _foul = foul_type.selected_key.lower().replace("fouls", "foul")
-    _panels = list(dict.fromkeys(picked["stat"]))  # stats in picker order
-    _single = len(_panels) == 1
+    _label = f"{stat.selected_key} per {foul_type.selected_key.lower().replace('fouls', 'foul')}"
 
     _x = alt.X("season:O", sort=seasons_axis, title=None, scale=alt.Scale(domain=seasons_axis))
+    _y = alt.Y("per_foul:Q", title=_label, scale=alt.Scale(zero=False))
     _color = alt.Color(
         "player:N",
         scale=alt.Scale(domain=_order, range=PALETTE[: len(_order)]),
         title=None,
         legend=alt.Legend(orient="top"),
     )
+    _tip = [
+        alt.Tooltip("player:N", title="Player"),
+        alt.Tooltip("season:O", title="Season"),
+        alt.Tooltip("per_foul:Q", title=_label, format=".1f"),
+        alt.Tooltip("value:Q", title=stat.selected_key, format=",.0f"),
+        alt.Tooltip("fouls:Q", title=foul_type.selected_key),
+        alt.Tooltip("games:Q", title="Games"),
+    ]
 
-    # One hover param shared by all panels: hovering a season marks it everywhere.
-    # Altair warns when it merges the copies across panels; that merge is the point.
-    warnings.filterwarnings("ignore", message="Automatically deduplicated selection")
-    _hover = alt.selection_point(
-        name="season_hover", fields=["season"], nearest=True, on="pointerover", empty=False
+    # Lines get a row for every season, null where a player didn't qualify, so the
+    # line breaks instead of bridging the missing season.
+    _grid = pd.MultiIndex.from_product([_order, seasons_axis], names=["player", "season"])
+    _line = picked.set_index(["player", "season"]).reindex(_grid).reset_index()
+
+    _hover = alt.selection_point(fields=["season"], nearest=True, on="pointerover", empty=False)
+    _layers = []
+    if show_league.value:
+        _layers.append(
+            alt.Chart(league)
+            .mark_line(strokeDash=[4, 4], strokeWidth=1.5, color="#8a8a85")
+            .encode(
+                x=_x,
+                y=_y,
+                tooltip=[
+                    alt.Tooltip("season:O", title="Season"),
+                    alt.Tooltip("per_foul:Q", title=f"League {_label.lower()}", format=".1f"),
+                ],
+            )
+        )
+    _layers += [
+        alt.Chart(_line)
+        .mark_line(strokeWidth=2, invalid="break-paths-filter-domains")
+        .encode(x=_x, y=_y, color=_color),
+        alt.Chart(picked)
+        .mark_point(filled=True, size=70, stroke="white", strokeWidth=2, opacity=1)
+        .encode(x=_x, y=_y, color=_color, tooltip=_tip),
+        # Invisible wide hit targets for the vertical crosshair.
+        alt.Chart(picked).mark_rule(opacity=0, strokeWidth=24).encode(x=_x).add_params(_hover),
+        alt.Chart(picked)
+        .mark_rule(color="#8a8a85", strokeWidth=1)
+        .encode(x=_x)
+        .transform_filter(_hover),
+    ]
+    # Direct labels at each player's last season when there are few lines.
+    if 0 < len(_order) <= 4:
+        _last = picked.sort_values("season").groupby("player").tail(1)
+        _layers.append(
+            alt.Chart(_last)
+            .mark_text(align="left", dx=8, fontSize=11, color="#555")
+            .encode(x=_x, y=_y, text="player:N")
+        )
+
+    chart = alt.layer(*_layers).properties(
+        title=f"{_label}, {season_type.value.lower()}",
+        width="container",
+        height=380,
     )
-
-    def _panel(name):
-        _d = picked[picked["stat"] == name]
-        # Lines get a row for every season with a null value where a player didn't
-        # qualify, so the line breaks instead of bridging the missing season.
-        _grid = pd.MultiIndex.from_product([_order, seasons_axis], names=["player", "season"])
-        _line = _d.set_index(["player", "season"]).reindex(_grid).reset_index()
-        _label = f"{name} per {_foul}"
-        _y = alt.Y("per_foul:Q", title=_label, scale=alt.Scale(zero=False))
-        _tip = [
-            alt.Tooltip("player:N", title="Player"),
-            alt.Tooltip("season:O", title="Season"),
-            alt.Tooltip("per_foul:Q", title=_label, format=".1f"),
-            alt.Tooltip("value:Q", title=name, format=",.0f"),
-            alt.Tooltip("fouls:Q", title=foul_type.selected_key),
-            alt.Tooltip("games:Q", title="Games"),
-        ]
-        _base = alt.Chart(_d).encode(x=_x, y=_y, color=_color)
-        _layers = []
-        if show_league.value:
-            _layers.append(
-                alt.Chart(league[league["stat"] == name])
-                .mark_line(strokeDash=[4, 4], strokeWidth=1.5, color="#8a8a85")
-                .encode(
-                    x=_x,
-                    y=_y,
-                    tooltip=[
-                        alt.Tooltip("season:O", title="Season"),
-                        alt.Tooltip("per_foul:Q", title=f"League {_label.lower()}", format=".1f"),
-                    ],
-                )
-            )
-        _layers += [
-            alt.Chart(_line)
-            .mark_line(strokeWidth=2, invalid="break-paths-filter-domains")
-            .encode(x=_x, y=_y, color=_color),
-            _base.mark_point(filled=True, size=60, stroke="white", strokeWidth=2, opacity=1).encode(
-                tooltip=_tip
-            ),
-            # Invisible wide hit targets for the vertical crosshair.
-            alt.Chart(_d).mark_rule(opacity=0, strokeWidth=24).encode(x=_x).add_params(_hover),
-            alt.Chart(_d)
-            .mark_rule(color="#8a8a85", strokeWidth=1)
-            .encode(x=_x)
-            .transform_filter(_hover),
-        ]
-        # Direct labels at each player's last season: single wide panel, few lines only.
-        if _single and len(_order) <= 4:
-            _last = _d.sort_values("season").groupby("player").tail(1)
-            _layers.append(
-                alt.Chart(_last)
-                .mark_text(align="left", dx=8, fontSize=11, color="#555")
-                .encode(x=_x, y=_y, text="player:N")
-            )
-        return alt.layer(*_layers).properties(
-            title=_label,
-            width="container" if _single else 330,
-            height=380 if _single else 220,
-        )
-
-    if not _order:
-        _out = mo.md("_Add a player above to plot._")
-    elif not _panels:
-        _out = mo.md("_Pick at least one stat to count per foul._")
-    else:
-        chart = (
-            _panel(_panels[0]) if _single else alt.concat(*[_panel(n) for n in _panels], columns=2)
-        ).properties(
-            title=alt.TitleParams(
-                f"Per {_foul}, {season_type.value.lower()}", anchor="start", fontSize=14
-            )
-        )
-        _out = mo.ui.altair_chart(chart)
-    _out
-    return
+    mo.ui.altair_chart(chart) if _order else mo.md("_Add a player above to plot._")
+    return (chart,)
 
 
 @app.cell
-def _(mo, picked):
-    # Table view of what's plotted: one row per player-season, a column pair per stat.
-    if len(picked):
-        _t = picked.pivot_table(
-            index=["player", "season", "games", "fouls"],
-            columns="stat",
-            values=["value", "per_foul"],
-            sort=False,
-        )
-        _t.columns = [
-            f"{s.lower()}" if v == "value" else f"{s.lower()}_per_foul" for v, s in _t.columns
-        ]
-        _t = _t.reset_index().round(1)
-    else:
-        _t = picked
+def _(mo, picked, stat):
+    # Table view of what's plotted.
+    _name = stat.selected_key.lower()
+    _t = picked.round({"value": 0, "per_foul": 1}).rename(
+        columns={"value": _name, "per_foul": f"{_name}_per_foul"}
+    )
     mo.accordion({"Data table": mo.ui.table(_t, selection=None)})
     return
 

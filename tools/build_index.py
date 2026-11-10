@@ -51,11 +51,12 @@ def main() -> None:
             by_tag[t].append(f"[{folder.name}]({link})")
 
         ideas = []
-        for idea in sorted(p for p in (folder / "ideas").glob("*/") if p.is_dir()):
+        # idea folders sit directly in the area; _-prefixed entries are the area's own files
+        for idea in sorted(p for p in folder.iterdir() if p.is_dir() and not p.name.startswith("_")):
             if not (idea / "README.md").exists():
                 continue
             im = front_matter(idea / "README.md")
-            ilink = f"{link}ideas/{idea.name}/"
+            ilink = f"{link}{idea.name}/"
             # creation order = stream of thought
             ideas.append((str(im.get("created", "")), im, ilink))
             counts[im.get("status", "?")] += 1

@@ -9,17 +9,18 @@ NBA analytics. Sister repo to `../bballagg`, which scrapes stats.nba.com and own
 - Schema, table meanings and data-quality notes live in `../bballagg/CLAUDE.md` (sections "Endpoint categories", "Schema", "Data quality"). Read them before querying a table for the first time. Key facts: tables are `nba_<endpoint>_<shard>`, `_a` is usually player rows; ids are text; game universe is `master_nba_games` (2 rows per game, one per team); V3 tables use `personid`, older ones `playerid`.
 - **Zero-filled rows:** before a stat was tracked the API returns all-zero rows, and they are stored. Always filter with `bball.real.where(table, alias)` before aggregating. Open bballagg issue (Known issues 8) to make them NULL; then drop the filters.
 - The data changes as bballagg scrapes. Record the date you ran an analysis in its README `data:` line.
-- Never commit data. `extracts/` and `models/` are gitignored in every analysis folder.
+- Never commit data. `_extracts/` and `_models/` are gitignored in every area and idea folder.
 
 ## Layout
 
 ```
 analyses/<area>/                  an area to explore, any subject (reffing, stadium-altitude, injuries)
     README.md                     front matter: title, question, status, created, tags, data
-    notebook.py                   marimo
-    figures/ tables/ docs/        committed (keep tables small)
-    extracts/ models/             gitignored
-    ideas/<idea>/                 one specific line of thought, same shape; ONE level only
+    _notebook.py                  optional area overview (marimo)
+    _docs/ _figures/ _tables/     committed (keep tables small)
+    _extracts/ _models/           gitignored
+    <idea>/                       one specific line of thought, directly in the area; ONE level only
+        README.md  notebook.py  _docs/ _figures/ _tables/ (+ gitignored _extracts/ _models/)
 src/bball/                        shared code: db, real (zero-row filters), style (plots, save helpers)
 templates/analysis/               copied by `pixi run new`
 tools/                            new_analysis.py, build_index.py
@@ -30,7 +31,7 @@ tags.txt                          usual tags (loose taxonomy, not enforced)
 
 Rules:
 - Areas are free-form subjects, not limited to a fixed list. Ideas are the exact, answerable questions inside an area; the slug is short, the full question goes in `question:`. Together the idea folders are the trail of where each number came from.
-- Ideas nest one level only, all in the area's `ideas/` folder. INDEX.md lists them in creation order, which is the stream of thought. An idea that grows into a subject of its own can be promoted to a new area (`git mv`, mention where it came from in its README).
+- Support files and folders start with `_` so `ls` lists them together above the idea folders; idea slugs never start with `_`. Ideas nest one level only, directly in the area folder. INDEX.md lists them in creation order, which is the stream of thought. An idea that grows into a subject of its own can be promoted to a new area (`git mv`, mention where it came from in its README).
 - Names: lowercase-hyphen slugs, no dates or numbers. Dates and tags go in front matter.
 - Tags are for cross-cutting search (`officiating`, `clutch`, `tracking-era`). Any tag is allowed; add reused ones to `tags.txt` to keep spelling consistent.
 - Shared logic goes in `src/bball/` as soon as a second notebook needs it. Don't copy helpers between notebooks.
@@ -40,7 +41,7 @@ Rules:
 ## Commands
 
 - `pixi run new <area>`: new area. `pixi run new <area>/<idea> [-q "question"] [-t tag1,tag2]`: new idea. `pixi run new --help` for details.
-- `pixi run edit analyses/<area>/ideas/<idea>/notebook.py`: open in marimo.
+- `pixi run edit analyses/<area>/<idea>/notebook.py`: open in marimo. `bball.style.save(fig, name, here)` writes to `_figures/`, `save_table` to `_tables/`.
 - `pixi run index`: rebuild INDEX.md.
 - Lint: `uvx ruff check .` / `uvx ruff format .`.
 

@@ -7,7 +7,11 @@
     pixi run new reffing/star-call-rate -q "Calls per possession for star players"
 
 An area is any subject you want to explore. Ideas are the specific lines of thought
-inside it, one folder each, one level deep. INDEX.md lists them in the order created.
+inside it, one folder each directly under the area (analyses/reffing/star-call-rate/),
+one level deep. INDEX.md lists them in the order created.
+
+Support files are prefixed with _ so they sort together above the ideas:
+area: README.md _notebook.py _docs/ _figures/ _tables/; idea: README.md notebook.py _docs/ ...
 Tags are free-form; tags.txt lists the usual ones (unknown tags get a warning, not an error).
 """
 
@@ -35,7 +39,7 @@ def check_slug(s: str) -> None:
         sys.exit(f"'{s}': use lowercase letters, digits and single hyphens (e.g. star-call-rate)")
 
 
-def render(folder: Path, title: str, question: str, tags: list[str]) -> None:
+def render(folder: Path, title: str, question: str, tags: list[str], notebook: str) -> None:
     folder.mkdir(parents=True)
     values = {
         "{title}": title,
@@ -45,12 +49,12 @@ def render(folder: Path, title: str, question: str, tags: list[str]) -> None:
         "{question}": question,
         "{tags}": json.dumps(tags),
     }
-    for name in ("README.md", "notebook.py"):
-        text = (TEMPLATE / name).read_text()
+    for src, dst in (("README.md", "README.md"), ("notebook.py", notebook)):
+        text = (TEMPLATE / src).read_text()
         for k, v in values.items():
             text = text.replace(k, v)
-        (folder / name).write_text(text)
-    for sub in ("figures", "tables", "docs"):
+        (folder / dst).write_text(text)
+    for sub in ("_figures", "_tables", "_docs"):
         (folder / sub).mkdir()
         (folder / sub / ".gitkeep").touch()
     print(f"created {folder.relative_to(ROOT)}/")
@@ -72,21 +76,21 @@ def main() -> None:
     if len(parts) == 1:
         area = parts[0]
         check_slug(area)
-        folder = ANALYSES / area
+        folder, notebook = ANALYSES / area, "_notebook.py"
         title = area.replace("-", " ").capitalize()
     elif len(parts) == 2:
         area, idea = parts
         if not (ANALYSES / area).is_dir():
             sys.exit(f"no area analyses/{area}/ yet; create it first: pixi run new {area}")
         check_slug(idea)
-        folder = ANALYSES / area / "ideas" / idea
+        folder, notebook = ANALYSES / area / idea, "notebook.py"
         title = idea.replace("-", " ").capitalize()
     else:
         sys.exit("ideas go one level deep: <area>/<idea>")
 
     if folder.exists():
         sys.exit(f"{folder.relative_to(ROOT)} already exists")
-    render(folder, title, a.question, tags)
+    render(folder, title, a.question, tags, notebook)
     subprocess.run([sys.executable, str(ROOT / "tools" / "build_index.py")], check=True)
 
 

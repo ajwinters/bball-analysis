@@ -8,11 +8,11 @@ Status: active 1, idea 1
 
 - [Reffing](analyses/reffing/) · **idea** · 2026-11-09 19:10 `officiating`
   How do referees treat players and situations?
-  - [Touches per foul](analyses/reffing/ideas/touches-per-foul/) · **active** · 2026-11-09 19:10 `officiating` `players` `tracking-era`
+  - [Touches per foul](analyses/reffing/touches-per-foul/) · **active** · 2026-11-09 19:10 `officiating` `players` `tracking-era`
     How many touches does a player get per foul called in their favor (fouls drawn), and how does that change across seasons?
 
 ## By tag
 
-- `officiating`: [reffing](analyses/reffing/), [reffing/touches-per-foul](analyses/reffing/ideas/touches-per-foul/)
-- `players`: [reffing/touches-per-foul](analyses/reffing/ideas/touches-per-foul/)
-- `tracking-era`: [reffing/touches-per-foul](analyses/reffing/ideas/touches-per-foul/)
+- `officiating`: [reffing](analyses/reffing/), [reffing/touches-per-foul](analyses/reffing/touches-per-foul/)
+- `players`: [reffing/touches-per-foul](analyses/reffing/touches-per-foul/)
+- `tracking-era`: [reffing/touches-per-foul](analyses/reffing/touches-per-foul/)

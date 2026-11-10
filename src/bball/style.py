@@ -34,16 +34,16 @@ def use() -> None:
 
 
 def save(fig: plt.Figure, name: str, folder: Path | str, fmt: str = "png") -> Path:
-    """Save to <folder>/figures/<name>.<fmt> and return the path."""
-    out = Path(folder) / "figures" / f"{name}.{fmt}"
+    """Save to <folder>/_figures/<name>.<fmt> and return the path."""
+    out = Path(folder) / "_figures" / f"{name}.{fmt}"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)
     return out
 
 
 def save_table(df, name: str, folder: Path | str) -> Path:
-    """Save a small result table to <folder>/tables/<name>.csv (committed; keep it small)."""
-    out = Path(folder) / "tables" / f"{name}.csv"
+    """Save a small result table to <folder>/_tables/<name>.csv (committed; keep it small)."""
+    out = Path(folder) / "_tables" / f"{name}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
     return out

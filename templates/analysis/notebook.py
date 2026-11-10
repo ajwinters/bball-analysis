@@ -13,7 +13,7 @@ def _():
 
     style.use()
     engine = db.engine()  # marimo SQL cells can use this connection
-    here = mo.notebook_dir()  # figures/ and tables/ are saved next to this file
+    here = mo.notebook_dir()  # _figures/ and _tables/ are saved next to this file
     return db, engine, here, mo, plt, real, style
 
 
